@@ -1,0 +1,26 @@
+{
+  "name": "contract-impact-board",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Какие потребители API заденет изменение контракта: две схемы OpenAPI и карта потребителей на входе, список затронутых команд и полей на выходе",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/*.test.ts\"",
+    "build": "node scripts/build.mjs",
+    "site": "node scripts/build-site.mjs",
+    "serve": "node scripts/serve.mjs",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0"
+  }
+}

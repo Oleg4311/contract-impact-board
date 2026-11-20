@@ -1,0 +1,108 @@
+openapi: 3.0.3
+info: { title: Shop API, version: "1.0" }
+paths:
+  /users:
+    get:
+      summary: Список пользователей
+      parameters:
+        - { name: limit, in: query, schema: { type: integer } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+                  next: { type: string }
+  /users/{id}:
+    get:
+      summary: Один пользователь
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "404":
+          description: нет такого
+  /orders:
+    post:
+      summary: Создать заказ
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [sku, qty]
+                    properties:
+                      sku: { type: string }
+                      qty: { type: integer }
+                coupon: { type: string }
+                note: { type: string }
+      responses:
+        "201":
+          description: создан
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, total, status]
+                properties:
+                  id: { type: string }
+                  total: { type: number }
+                  status: { type: string, enum: [new, paid] }
+        "400":
+          description: неверный запрос
+  /orders/{id}:
+    get:
+      summary: Заказ
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, total]
+                properties:
+                  id: { type: string }
+                  total: { type: number }
+  /legacy/ping:
+    get:
+      summary: Старая проверка живости
+      responses:
+        "200": { description: ok }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  schemas:
+    User:
+      type: object
+      required: [id, name, email]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [admin, user] }
+        address:
+          type: object
+          properties:
+            city: { type: string }
+            zip: { type: string }

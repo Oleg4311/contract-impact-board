@@ -1,0 +1,68 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Собранный CLI работает как отдельный файл
+        run: |
+          node dist/contract-impact.mjs fixtures/shop/v1.yaml fixtures/shop/v2.yaml fixtures/shop/consumers.yaml --fail-on broken && exit 1 || test $? -eq 1
+
+  # Сверка с настоящим oasdiff: те же пары схем, множества «операция + правило» среди ошибок и предупреждений должны совпасть
+  oasdiff:
+    runs-on: ubuntu-latest
+    env:
+      OASDIFF_VERSION: 1.39.0
+      OASDIFF_SHA256: 71a85930728f367a2086077b7ae1411319421549d18473a3e8258b6451520433
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Скачать oasdiff и проверить контрольную сумму
+        run: |
+          curl -fsSL -o oasdiff.tar.gz "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz"
+          echo "${OASDIFF_SHA256}  oasdiff.tar.gz" | sha256sum -c
+          mkdir -p /tmp/oasdiff && tar -xzf oasdiff.tar.gz -C /tmp/oasdiff oasdiff
+          /tmp/oasdiff/oasdiff --version
+      - name: Выгрузить пары схем из тестов
+        run: EXPORT_CASES_DIR=/tmp/cases npm test
+      - name: Сверка
+        run: node scripts/crosscheck-oasdiff.mjs /tmp/oasdiff/oasdiff /tmp/cases
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results/

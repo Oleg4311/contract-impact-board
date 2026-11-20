@@ -1,0 +1,27 @@
+# Кто и что использует. Список полей не указан — значит «неизвестно», пустой список — «не использует».
+consumers:
+  mobile-app:
+    owner: "@team-mobile"
+    uses:
+      - operation: GET /users/{id}
+        response: [id, name, email]
+        check: npm run test:contract -- users
+      - operation: POST /orders
+        request: [items, coupon]
+        response: [id, total]
+        check: npm run test:contract -- orders
+  billing-service:
+    owner: "@team-billing"
+    uses:
+      - operation: GET /users/{id}
+        response: [email, address.zip]
+        check: make contract-test SERVICE=users
+      - operation: GET /orders/{id}
+        response: [id, total]
+  analytics-job:
+    owner: "@team-data"
+    uses:
+      - operation: GET /users
+        response: [items.id, items.name]
+        parameters: [limit, cursor]
+        check: pytest tests/test_users_export.py
