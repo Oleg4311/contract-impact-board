@@ -51,13 +51,14 @@ export interface Operation {
   raw: Json;
   deprecated: boolean;
   parameters: Map<string, Json>; // «query:limit» → параметр (уже без $ref)
-  security: string[]; // имена схем безопасности, действующие для операции
+  /** Альтернативы безопасности («или»): каждая — набор схем, применяемых вместе («и»), в виде «a+b». Пустой список или «» — доступ без авторизации. */
+  security: string[];
 }
 
 /** Все операции спецификации в виде карты «METHOD /path» → Operation. */
 export function operations(doc: Json): Map<string, Operation> {
   const out = new Map<string, Operation>();
-  const rootSecurity = securityNames(doc.security);
+  const rootSecurity = securityAlternatives(doc.security);
   for (const [path, item0] of Object.entries<Json>(doc.paths)) {
     const item = deref(doc, item0);
     if (!item || typeof item !== 'object') continue;
@@ -78,16 +79,14 @@ export function operations(doc: Json): Map<string, Operation> {
         raw,
         deprecated: raw.deprecated === true,
         parameters: params,
-        security: raw.security !== undefined ? securityNames(raw.security) : rootSecurity,
+        security: raw.security !== undefined ? securityAlternatives(raw.security) : rootSecurity,
       });
     }
   }
   return out;
 }
 
-function securityNames(sec: Json): string[] {
+function securityAlternatives(sec: Json): string[] {
   if (!Array.isArray(sec)) return [];
-  const names = new Set<string>();
-  for (const req of sec) for (const n of Object.keys(req ?? {})) names.add(n);
-  return [...names].sort();
+  return [...new Set(sec.map((req: Json) => Object.keys(req ?? {}).sort().join('+')))].sort();
 }

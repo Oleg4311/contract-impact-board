@@ -61,11 +61,19 @@ function diffOperation(oldDoc: Json, newDoc: Json, o: Operation, n: Operation, o
   const op = o.key;
 
   // --- безопасность ---
-  for (const s of n.security) {
-    if (!o.security.includes(s)) out.push(mk({ id: 'api-security-added', level: 'error', operation: op, scope: 'security', path: s, text: `добавлено требование безопасности «${s}»` }));
-  }
-  for (const s of o.security) {
-    if (!n.security.includes(s)) out.push(mk({ id: 'api-security-removed', level: 'info', operation: op, scope: 'security', path: s, text: `убрано требование безопасности «${s}»` }));
+  // Требования безопасности — альтернативы («или»): добавление ещё одного способа клиента не ломает.
+  // Ломает появление защиты у открытой операции и исчезновение способа, которым клиенты пользуются.
+  const anonymous = (alts: string[]): boolean => alts.length === 0 || alts.includes('');
+  if (anonymous(o.security) && !anonymous(n.security)) {
+    out.push(mk({ id: 'api-security-anonymous-access-removed', level: 'error', operation: op, scope: 'security', text: 'операция была открытой, теперь требует авторизацию' }));
+  } else if (!anonymous(o.security)) {
+    for (const s of o.security) {
+      if (n.security.includes(s) || s === '') continue;
+      out.push(mk({ id: 'api-security-removed', level: anonymous(n.security) ? 'info' : 'warn', operation: op, scope: 'security', path: s, text: `убран способ авторизации «${s}»` }));
+    }
+    for (const s of n.security) {
+      if (!o.security.includes(s) && s !== '' ) out.push(mk({ id: 'api-security-added', level: 'info', operation: op, scope: 'security', path: s, text: `добавлен способ авторизации «${s}»` }));
+    }
   }
 
   // --- параметры ---
@@ -79,7 +87,15 @@ function diffOperation(oldDoc: Json, newDoc: Json, o: Operation, n: Operation, o
     if (p.required && !np.required) out.push(mk({ id: 'request-parameter-became-optional', level: 'info', operation: op, scope: 'parameter', path: k, text: `параметр ${p.in} «${p.name}» стал необязательным` }));
     const ot = paramType(oldDoc, p);
     const nt = paramType(newDoc, np);
-    if (ot !== nt) out.push(mk({ id: 'request-parameter-type-changed', level: 'error', operation: op, scope: 'parameter', path: k, text: `тип параметра ${p.in} «${p.name}» изменён: ${ot || '—'} → ${nt || '—'}` }));
+    if (ot !== nt) {
+      // параметры передаются строками: расширение до string или integer → number клиента не ломает
+      const widened = nt === 'string' || (ot.startsWith('integer') && nt === 'number');
+      out.push(
+        widened
+          ? mk({ id: 'request-parameter-type-generalized', level: 'info', operation: op, scope: 'parameter', path: k, text: `тип параметра ${p.in} «${p.name}» расширен: ${ot || '—'} → ${nt || '—'}` })
+          : mk({ id: 'request-parameter-type-changed', level: 'error', operation: op, scope: 'parameter', path: k, text: `тип параметра ${p.in} «${p.name}» изменён: ${ot || '—'} → ${nt || '—'}` }),
+      );
+    }
     const oe = paramEnum(oldDoc, p);
     const ne = paramEnum(newDoc, np);
     if (oe && ne) {
@@ -118,7 +134,7 @@ function diffOperation(oldDoc: Json, newDoc: Json, o: Operation, n: Operation, o
       out.push(
         isSuccess(status)
           ? mk({ id: 'response-success-status-removed', level: 'error', operation: op, scope: 'response', status, text: `убран успешный ответ ${status}` })
-          : mk({ id: 'response-non-success-status-removed', level: 'warn', operation: op, scope: 'response', status, text: `убран ответ ${status}` }),
+          : mk({ id: 'response-non-success-status-removed', level: 'info', operation: op, scope: 'response', status, text: `убран ответ ${status}` }),
       );
       continue;
     }

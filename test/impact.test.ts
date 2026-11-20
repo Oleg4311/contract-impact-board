@@ -65,7 +65,7 @@ describe('сценарий «магазин»: удалено поле email', (
   test('billing: удалено address.zip — предупреждение, security добавлена — ошибка', () => {
     const ids = byName['billing-service']!.hits.map((h) => `${h.change.id}:${h.change.level}`);
     assert.ok(ids.includes('response-optional-property-removed:warn'));
-    assert.ok(ids.includes('api-security-added:error'));
+    assert.ok(ids.includes('api-security-anonymous-access-removed:error'));
   });
 
   test('команды проверки берутся только у затронутых использований', () => {
@@ -144,13 +144,14 @@ describe('метаморфические свойства', () => {
       ['response-optional-property-removed', ['response-required-property-added', 'response-optional-property-added']],
       ['new-required-request-property', ['request-property-removed']],
       ['request-property-removed', ['new-optional-request-property', 'new-required-request-property']],
-      ['api-security-added', ['api-security-removed']],
+      ['api-security-anonymous-access-removed', ['api-security-removed']],
       ['api-path-removed-without-deprecation', ['endpoint-added']],
       ['endpoint-added', ['api-path-removed-without-deprecation', 'api-removed-without-deprecation']],
     ];
     for (const [fwd, back] of pairs) {
       for (const c of d12.filter((x) => x.id === fwd)) {
-        assert.ok(back.some((b) => d21.some((x) => key(x.id, x) === key(b, c))), `для ${key(fwd, c)} нет обратного изменения среди ${back.join(', ')}`);
+        const loose = fwd.startsWith('api-security'); // у безопасности путь — имя схемы, в обратную сторону он другой
+        assert.ok(back.some((b) => d21.some((x) => (loose ? x.id === b && x.operation === c.operation : key(x.id, x) === key(b, c)))), `для ${key(fwd, c)} нет обратного изменения среди ${back.join(', ')}`);
       }
     }
   });
